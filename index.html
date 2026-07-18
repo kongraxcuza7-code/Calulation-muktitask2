@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="คิดเลข">
+<meta name="theme-color" content="#0f1923">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>เกมเดินจุดคิดเลข</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1923;--bg2:#162030;--bg3:#1e2d40;--bg4:#253344;
+  --accent:#00e5a0;--accent2:#7c6af7;--warn:#ff6b6b;--gold:#ffc947;
+  --text:#e8f4f0;--text2:#7a9bb0;--text3:#4a6a80;
+  --r:16px;--safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%;background:var(--bg)}
+body{
+  font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);
+  height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+  padding-top:var(--safe-top);padding-bottom:var(--safe-bot);
+}
+
+/* ── OVERLAY ── */
+#overlay{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:max(56px,calc(var(--safe-top)+40px)) 24px max(32px,var(--safe-bot));
+  overflow-y:auto;gap:0;
+}
+.ov-icon{font-size:72px;margin-bottom:12px;line-height:1}
+.ov-title{font-size:28px;font-weight:700;color:var(--accent);letter-spacing:0.5px;margin-bottom:4px}
+.ov-line{width:48px;height:3px;background:var(--accent);border-radius:2px;margin:0 auto 20px}
+.ov-desc{font-size:14px;color:var(--text2);line-height:1.8;text-align:center;max-width:300px;margin-bottom:20px}
+
+/* difficulty cards */
+.diff-label{font-size:12px;color:var(--text2);letter-spacing:1px;margin-bottom:10px;text-align:center}
+.diff-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:320px;margin-bottom:20px}
+.diff-card{
+  padding:14px 8px;border-radius:var(--r);border:1.5px solid rgba(255,255,255,0.08);
+  background:var(--bg3);cursor:pointer;text-align:center;transition:all .2s;
+}
+.diff-card.sel{border-color:var(--accent);background:rgba(0,229,160,0.1)}
+.diff-card .dc-icon{font-size:24px;margin-bottom:4px}
+.diff-card .dc-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.diff-card .dc-desc{font-size:10px;color:var(--text2);line-height:1.4}
+.diff-card.sel .dc-name{color:var(--accent)}
+
+/* mode chips */
+.mode-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;max-width:320px}
+.mode-chip{
+  padding:7px 14px;border-radius:999px;font-size:13px;font-weight:500;
+  border:1px solid rgba(255,255,255,0.1);background:var(--bg3);color:var(--text2);
+  cursor:pointer;transition:all .15s;
+}
+.mode-chip.sel{background:rgba(124,106,247,0.2);border-color:var(--accent2);color:var(--accent2)}
+
+.ov-settings{width:100%;max-width:320px;margin-bottom:24px}
+.ov-row{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:var(--bg3);border-radius:12px;margin-bottom:8px}
+.ov-row-label{font-size:13px;color:var(--text2)}
+.ov-row select{
+  background:var(--bg4);border:1px solid rgba(255,255,255,0.1);
+  color:var(--text);border-radius:8px;padding:4px 8px;font-size:13px;
+  font-family:'Kanit',sans-serif;outline:none;
+}
+
+.btn-big{
+  width:100%;max-width:320px;padding:17px;border-radius:var(--r);
+  background:var(--accent);color:#0a1410;font-family:'Kanit',sans-serif;
+  font-size:18px;font-weight:700;border:none;cursor:pointer;letter-spacing:0.3px;
+  transition:transform .1s,filter .15s;
+}
+.btn-big:active{transform:scale(0.97);filter:brightness(0.95)}
+
+/* ── HEADER ── */
+#hdr{
+  display:flex;align-items:center;padding:10px 14px 6px;
+  gap:6px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.hd-stat{flex:1;text-align:center}
+.hd-val{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;line-height:1}
+.hd-lbl{font-size:9px;color:var(--text3);letter-spacing:0.5px;margin-top:1px}
+.hd-sep{width:1px;height:32px;background:rgba(255,255,255,0.07)}
+#btn-menu{
+  width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);
+  background:var(--bg3);color:var(--text2);font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+
+/* ── TRACK ── */
+#track-sec{padding:8px 14px 4px;flex-shrink:0}
+#track-wrap{overflow-x:auto;scrollbar-width:none}
+#track-wrap::-webkit-scrollbar{display:none}
+#track{display:flex;gap:4px;align-items:center;padding:2px;width:max-content}
+.dot{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:600;font-family:'Space Mono',monospace;
+  flex-shrink:0;transition:all .2s;border:2px solid transparent;
+}
+.de{background:var(--bg3);color:var(--text3);border-color:rgba(255,255,255,0.06)}
+.dd{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent)}
+.dp{background:var(--accent);border-color:#00ffb3;color:#0a1410;font-size:15px;box-shadow:0 0 14px rgba(0,229,160,0.45)}
+.dw{background:rgba(255,107,107,0.15);border-color:var(--warn);color:var(--warn);animation:shk .35s}
+.dg{background:rgba(255,201,71,0.12);border-color:var(--gold);color:var(--gold);font-size:15px}
+.dc{width:6px;height:2px;background:rgba(255,255,255,0.08);flex-shrink:0;border-radius:1px}
+.dc.done{background:rgba(0,229,160,0.35)}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+/* ── METRO ── */
+#metro-sec{
+  padding:6px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.bds{display:flex;gap:5px}
+.bd{
+  width:9px;height:9px;border-radius:50%;
+  background:var(--bg3);border:1.5px solid rgba(255,255,255,0.1);transition:all .05s;
+}
+.bd.on{background:var(--accent2);border-color:var(--accent2);box-shadow:0 0 6px rgba(124,106,247,0.5)}
+.bd.ac{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px rgba(0,229,160,0.6)}
+#bpm-lbl{font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0}
+#tbar-w{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+#tbar{height:100%;background:var(--accent);border-radius:3px;width:100%}
+#tnum{font-family:'Space Mono',monospace;font-size:12px;color:var(--text2);min-width:22px;text-align:right;flex-shrink:0}
+#diff-badge{
+  padding:3px 9px;border-radius:999px;font-size:10px;font-weight:600;flex-shrink:0;
+}
+
+/* ── QUESTION ── */
+#q-sec{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 20px;gap:10px;min-height:0;
+}
+#q-badge{
+  font-size:11px;font-weight:500;letter-spacing:1px;
+  padding:4px 14px;border-radius:999px;
+  background:rgba(124,106,247,0.12);color:var(--accent2);
+  border:1px solid rgba(124,106,247,0.25);
+}
+#q-disp{
+  font-family:'Space Mono',monospace;
+  font-size:clamp(26px,8.5vw,46px);font-weight:700;
+  color:var(--text);letter-spacing:0.5px;text-align:center;line-height:1.2;
+}
+#q-disp .op{color:var(--accent2)}
+#q-disp .eq{color:var(--text3)}
+#q-hint{font-size:12px;color:var(--text3)}
+#fb-row{min-height:30px;display:flex;align-items:center;justify-content:center}
+#fb{
+  font-size:14px;font-weight:500;padding:5px 18px;border-radius:999px;
+  opacity:0;transition:opacity .2s;
+}
+#fb.show{opacity:1}
+#fb.ok{background:rgba(0,229,160,0.12);color:var(--accent);border:1px solid rgba(0,229,160,0.25)}
+#fb.err{background:rgba(255,107,107,0.12);color:var(--warn);border:1px solid rgba(255,107,107,0.25)}
+#fb.skip{background:rgba(122,155,176,0.1);color:var(--text2);border:1px solid rgba(122,155,176,0.15)}
+
+/* ── INPUT ── */
+#inp-sec{padding:6px 14px 10px;display:flex;gap:8px;align-items:center;flex-shrink:0}
+#ans{
+  flex:1;padding:15px 14px;
+  font-family:'Space Mono',monospace;font-size:24px;font-weight:700;
+  text-align:center;background:var(--bg3);color:var(--text);
+  border:1.5px solid rgba(255,255,255,0.08);border-radius:var(--r);
+  outline:none;-webkit-appearance:none;
+}
+#ans:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,0.12)}
+#ans::placeholder{color:var(--text3);font-size:15px}
+#btn-ok{
+  padding:15px 20px;border-radius:var(--r);background:var(--accent);
+  color:#0a1410;font-family:'Kanit',sans-serif;font-size:17px;font-weight:700;
+  border:none;cursor:pointer;flex-shrink:0;transition:transform .1s;
+}
+#btn-ok:active{transform:scale(0.96)}
+#btn-spk{
+  padding:15px 13px;border-radius:var(--r);
+  background:rgba(124,106,247,0.12);color:var(--accent2);
+  border:1.5px solid rgba(124,106,247,0.25);font-size:20px;
+  cursor:pointer;flex-shrink:0;transition:transform .1s;
+}
+#btn-spk:active{transform:scale(0.96)}
+
+/* ── WIN OVERLAY ── */
+#win{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px;gap:12px;text-align:center;
+}
+.win-icon{font-size:72px;line-height:1}
+.win-title{font-size:28px;font-weight:700;color:var(--gold)}
+.win-score{font-family:'Space Mono',monospace;font-size:52px;font-weight:700;color:var(--accent);line-height:1}
+.win-lbl{font-size:12px;color:var(--text2);margin-top:-6px}
+.win-row{display:flex;gap:24px;margin:8px 0}
+.ws{text-align:center}
+.ws-v{font-family:'Space Mono',monospace;font-size:24px;font-weight:700}
+.ws-l{font-size:11px;color:var(--text2)}
+.win-best{
+  padding:8px 20px;border-radius:999px;
+  background:rgba(255,201,71,0.1);color:var(--gold);
+  border:1px solid rgba(255,201,71,0.2);font-size:13px;font-weight:500;
+}
+
+/* ── INSTALL BANNER ── */
+#install-banner{
+  position:fixed;bottom:max(20px,var(--safe-bot));left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid rgba(0,229,160,0.3);border-radius:14px;
+  padding:12px 18px;display:none;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:300;width:calc(100% - 32px);max-width:360px;
+}
+.ib-icon{font-size:28px;flex-shrink:0}
+.ib-text{flex:1}
+.ib-title{font-size:13px;font-weight:600;color:var(--text)}
+.ib-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.ib-btns{display:flex;gap:6px;flex-shrink:0}
+.ib-add{
+  padding:7px 14px;border-radius:10px;background:var(--accent);
+  color:#0a1410;font-size:13px;font-weight:700;border:none;cursor:pointer;
+  font-family:'Kanit',sans-serif;
+}
+.ib-x{
+  width:32px;height:32px;border-radius:8px;background:transparent;
+  border:1px solid rgba(255,255,255,0.1);color:var(--text2);
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+
+/* iOS install hint */
+#ios-hint{
+  position:fixed;bottom:0;left:0;right:0;z-index:300;
+  background:var(--bg3);border-top:1px solid rgba(255,255,255,0.08);
+  padding:16px 20px max(20px,var(--safe-bot));
+  display:none;
+}
+.ios-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.ios-steps{font-size:12px;color:var(--text2);line-height:2}
+.ios-close{
+  float:right;background:transparent;border:none;color:var(--text2);
+  font-size:20px;cursor:pointer;margin-top:-2px;
+}
+</style>
+</head>
+<body>
+
+<!-- START OVERLAY -->
+<div id="overlay">
+  <div class="ov-icon">🎯</div>
+  <div class="ov-title">เกมเดินจุดคิดเลข</div>
+  <div class="ov-line"></div>
+  <div class="ov-desc">ตอบโจทย์ให้ทันก่อน <strong style="color:var(--text)">15 วินาที</strong><br>ตอบถูก → เดินหน้า 1 จุด<br>เมโทรนอมจะให้จังหวะตลอดเกม</div>
+
+  <div class="diff-label">เลือกระดับความยาก</div>
+  <div class="diff-grid">
+    <div class="diff-card" id="d-easy" onclick="selDiff('easy')">
+      <div class="dc-icon">🌱</div>
+      <div class="dc-name">ง่าย</div>
+      <div class="dc-desc">บวก/ลบ<br>3 หลัก</div>
+    </div>
+    <div class="diff-card sel" id="d-normal" onclick="selDiff('normal')">
+      <div class="dc-icon">⚡</div>
+      <div class="dc-name">ปานกลาง</div>
+      <div class="dc-desc">ผสม<br>ทุกประเภท</div>
+    </div>
+    <div class="diff-card" id="d-hard" onclick="selDiff('hard')">
+      <div class="dc-icon">🔥</div>
+      <div class="dc-name">ยาก</div>
+      <div class="dc-desc">คูณ/หาร<br>ตัวใหญ่</div>
+    </div>
+  </div>
+
+  <div class="diff-label">ประเภทโจทย์</div>
+  <div class="mode-row">
+    <div class="mode-chip sel" id="mc-mix" onclick="selMode('mix',this)">ผสม</div>
+    <div class="mode-chip" id="mc-add" onclick="selMode('add',this)">บวก/ลบ</div>
+    <div class="mode-chip" id="mc-mul" onclick="selMode('mul',this)">คูณ</div>
+    <div class="mode-chip" id="mc-div" onclick="selMode('div',this)">หาร</div>
+  </div>
+
+  <div class="ov-settings">
+    <div class="ov-row">
+      <span class="ov-row-label">จังหวะ (BPM)</span>
+      <select id="bpm-sel" onchange="setBPM(+this.value)">
+        <option value="40">40 — ช้า</option>
+        <option value="60" selected>60 — ปกติ</option>
+        <option value="80">80 — เร็ว</option>
+        <option value="100">100 — เร็วมาก</option>
+      </select>
+    </div>
+    <div class="ov-row">
+      <span class="ov-row-label">จุดเป้าหมาย</span>
+      <select id="goal-sel">
+        <option value="10">10 จุด</option>
+        <option value="15" selected>15 จุด</option>
+        <option value="20">20 จุด</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn-big" onclick="startGame()">เริ่มเล่น 🚶</button>
+</div>
+
+<!-- WIN OVERLAY -->
+<div id="win">
+  <div class="win-icon">🏆</div>
+  <div class="win-title">ยินดีด้วย!</div>
+  <div class="win-score" id="w-score">0</div>
+  <div class="win-lbl">คะแนน</div>
+  <div class="win-row">
+    <div class="ws"><div class="ws-v" style="color:var(--accent)" id="w-ok">0</div><div class="ws-l">ถูก</div></div>
+    <div class="ws"><div class="ws-v" style="color:var(--warn)" id="w-err">0</div><div class="ws-l">ผิด</div></div>
+    <div class="ws"><div class="ws-v" style="color:var(--text2)" id="w-skip">0</div><div class="ws-l">ข้าม</div></div>
+    <div class="ws"><div class="ws-v" style="color:var(--gold)" id="w-dots">0</div><div class="ws-l">จุด</div></div>
+  </div>
+  <div class="win-best" id="w-best" style="display:none"></div>
+  <button class="btn-big" onclick="showMenu()" style="max-width:280px;margin-top:4px">เมนูหลัก</button>
+  <button class="btn-big" onclick="startGame()" style="max-width:280px;background:var(--bg3);color:var(--text);border:1px solid rgba(255,255,255,0.1)">เล่นอีกรอบ</button>
+</div>
+
+<!-- GAME UI -->
+<div id="hdr">
+  <div class="hd-stat"><div class="hd-val" id="s-score" style="color:var(--accent2)">0</div><div class="hd-lbl">คะแนน</div></div>
+  <div class="hd-sep"></div>
+  <div class="hd-stat"><div class="hd-val" style="color:var(--accent)" id="s-ok">0</div><div class="hd-lbl">ถูก</div></div>
+  <div class="hd-sep"></div>
+  <div class="hd-stat"><div class="hd-val" style="color:var(--warn)" id="s-err">0</div><div class="hd-lbl">ผิด</div></div>
+  <div class="hd-sep"></div>
+  <div class="hd-stat"><div class="hd-val" style="color:var(--gold)" id="s-pos">0/15</div><div class="hd-lbl">จุด</div></div>
+  <button id="btn-menu" onclick="showMenu()">☰</button>
+</div>
+
+<div id="track-sec"><div id="track-wrap"><div id="track"></div></div></div>
+
+<div id="metro-sec">
+  <div class="bds">
+    <div class="bd" id="bd0"></div><div class="bd" id="bd1"></div>
+    <div class="bd" id="bd2"></div><div class="bd" id="bd3"></div>
+  </div>
+  <div id="bpm-lbl">60 BPM</div>
+  <div id="diff-badge"></div>
+  <div id="tbar-w"><div id="tbar"></div></div>
+  <div id="tnum">15</div>
+</div>
+
+<div id="q-sec">
+  <div id="q-badge">โจทย์</div>
+  <div id="q-disp">—</div>
+  <div id="q-hint"></div>
+  <div id="fb-row"><div id="fb"></div></div>
+</div>
+
+<div id="inp-sec">
+  <button id="btn-spk" onclick="speakNow()">🔊</button>
+  <input type="number" id="ans" placeholder="คำตอบ..." inputmode="decimal" autocomplete="off">
+  <button id="btn-ok" onclick="checkAns()">ตรวจ ✓</button>
+</div>
+
+<!-- iOS install hint -->
+<div id="ios-hint">
+  <button class="ios-close" onclick="document.getElementById('ios-hint').style.display='none'">✕</button>
+  <div class="ios-title">📲 ติดตั้งบน iPhone</div>
+  <div class="ios-steps">
+    1. กดปุ่ม <strong style="color:var(--text)">แชร์</strong> (กล่องมีลูกศรขึ้น) ที่แถบด้านล่าง<br>
+    2. เลื่อนลงหา <strong style="color:var(--text)">"Add to Home Screen"</strong><br>
+    3. กด <strong style="color:var(--text)">Add</strong> — แอปจะปรากฏบนหน้าจอหลัก
+  </div>
+</div>
+
+<script>
+if('serviceWorker' in navigator)
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+// ── STATE ──
+let AC=null,metroT=null,cdT=null,beatI=0,bpm=60;
+let mode='mix',diff='normal';
+let pos=0,score=0,okC=0,errC=0,skipC=0,total=15;
+let curQ=null,active=false,tLeft=15;
+const QT=15;
+
+const DIFF={
+  easy:{label:'🌱 ง่าย',color:'#00e5a0',ops:['add','sub'],ranges:{add:[50,299],sub:[50,299],mul:[2,9],div:[2,9],divQ:[1,9]}},
+  normal:{label:'⚡ ปานกลาง',color:'#7c6af7',ops:['add','sub','mul','div'],ranges:{add:[100,999],sub:[100,999],mul:[10,99],div:[2,49],divQ:[2,19]}},
+  hard:{label:'🔥 ยาก',color:'#ff6b6b',ops:['mul','div'],ranges:{add:[500,9999],sub:[500,9999],mul:[20,99],div:[5,99],divQ:[3,29]}}
+};
+
+// ── AUDIO ──
+function gAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function tone(freq,dur,vol=0.3,type='sine'){
+  try{
+    const c=gAC(),t=c.currentTime,o=c.createOscillator(),g=c.createGain();
+    o.connect(g);g.connect(c.destination);
+    o.frequency.value=freq;o.type=type;
+    g.gain.setValueAtTime(vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.start(t);o.stop(t+dur+0.01);
+  }catch(e){}
+}
+function playTick(a){tone(a?1000:700,0.07,a?0.45:0.28)}
+function playOK(){[523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.2,0.2),i*70))}
+function playErr(){tone(200,0.45,0.28,'sawtooth')}
+function playSkip(){tone(380,0.22,0.18)}
+
+// ── METRONOME ──
+function startMetro(){
+  clearInterval(metroT);beatI=0;runBeat();
+  metroT=setInterval(runBeat,60000/bpm);
+}
+function stopMetro(){
+  clearInterval(metroT);
+  [0,1,2,3].forEach(i=>document.getElementById('bd'+i).classList.remove('on','ac'));
+}
+function runBeat(){
+  const b=beatI%4;
+  [0,1,2,3].forEach(i=>document.getElementById('bd'+i).classList.remove('on','ac'));
+  document.getElementById('bd'+b).classList.add(b===0?'ac':'on');
+  playTick(b===0);beatI++;
+}
+function setBPM(v){
+  bpm=v;document.getElementById('bpm-lbl').textContent=v+' BPM';
+  if(active)startMetro();
+}
+
+// ── TTS ──
+function speak(t){
+  if(!window.speechSynthesis)return;
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);
+  u.lang='th-TH';u.rate=0.9;u.pitch=1.05;
+  window.speechSynthesis.speak(u);
+}
+function speakNow(){if(curQ)speak(curQ.spk)}
+
+// ── QUESTION GEN ──
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function genQ(){
+  const d=DIFF[diff],r=d.ranges;
+  let ops=mode==='mix'?d.ops:[mode];
+  // filter valid
+  if(!ops.length)ops=['add'];
+  const t=ops[rnd(0,ops.length-1)];
+  if(t==='add'){
+    const a=rnd(r.add[0],r.add[1]),b=rnd(r.add[0],r.add[1]);
+    return{html:`${a} <span class="op">+</span> ${b} <span class="eq">=</span> ?`,ans:a+b,spk:`${a} บวก ${b} เท่ากับเท่าไหร่`,hint:'บวก'};
+  }
+  if(t==='sub'){
+    const a=rnd(r.sub[0]+50,r.sub[1]),b=rnd(Math.floor(r.sub[0]*0.5),a-1);
+    return{html:`${a} <span class="op">−</span> ${b} <span class="eq">=</span> ?`,ans:a-b,spk:`${a} ลบ ${b} เท่ากับเท่าไหร่`,hint:'ลบ'};
+  }
+  if(t==='mul'){
+    const a=rnd(r.mul[0],r.mul[1]),b=rnd(r.mul[0],r.mul[1]);
+    return{html:`${a} <span class="op">×</span> ${b} <span class="eq">=</span> ?`,ans:a*b,spk:`${a} คูณ ${b} เท่ากับเท่าไหร่`,hint:'คูณ'};
+  }
+  // div
+  const b=rnd(r.div[0],r.div[1]),q=rnd(r.divQ[0],r.divQ[1]);
+  if(rnd(0,1)){
+    const rem=rnd(1,b-1),a=b*q*10+rem;
+    const ans=Math.round((a/b)*10)/10;
+    return{html:`${a} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans,spk:`${a} หาร ${b} เท่ากับเท่าไหร่`,hint:'หาร (ทศนิยม)'};
+  }
+  return{html:`${b*q} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans:q,spk:`${b*q} หาร ${b} เท่ากับเท่าไหร่`,hint:'หาร'};
+}
+
+// ── GAME ──
+function startGame(){
+  gAC();
+  total=+document.getElementById('goal-sel').value;
+  bpm=+document.getElementById('bpm-sel').value;
+  document.getElementById('bpm-lbl').textContent=bpm+' BPM';
+  pos=0;score=0;okC=0;errC=0;skipC=0;active=true;
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('win').style.display='none';
+  const db=document.getElementById('diff-badge');
+  db.textContent=DIFF[diff].label;
+  db.style.cssText=`background:${DIFF[diff].color}22;color:${DIFF[diff].color};border:1px solid ${DIFF[diff].color}44;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:600`;
+  buildTrack();updStats();startMetro();newQ();
+}
+
+function showMenu(){
+  active=false;stopMetro();clearInterval(cdT);
+  window.speechSynthesis&&window.speechSynthesis.cancel();
+  document.getElementById('overlay').style.display='flex';
+}
+
+function buildTrack(){
+  const t=document.getElementById('track');t.innerHTML='';
+  for(let i=0;i<=total;i++){
+    if(i>0){const c=document.createElement('div');c.className='dc';c.id='con'+(i-1);t.appendChild(c);}
+    const d=document.createElement('div');
+    d.id='dot'+i;d.className='dot '+(i===0?'dp':i===total?'dg':'de');
+    d.textContent=i===0?'🚶':i===total?'🏆':i;
+    t.appendChild(d);
+  }
+}
+
+function newQ(){
+  clearInterval(cdT);
+  curQ=genQ();
+  document.getElementById('q-disp').innerHTML=curQ.html;
+  document.getElementById('q-hint').textContent=curQ.hint;
+  document.getElementById('ans').value='';
+  setFB('','');
+  tLeft=QT;updBar();
+  setTimeout(()=>speak(curQ.spk),350);
+  cdT=setInterval(()=>{
+    tLeft--;updBar();
+    if(tLeft<=0){clearInterval(cdT);doSkip();}
+  },1000);
+}
+
+function updBar(){
+  const p=(tLeft/QT)*100;
+  const bar=document.getElementById('tbar');
+  bar.style.width=p+'%';
+  bar.style.background=tLeft<=4?'var(--warn)':tLeft<=7?'var(--gold)':'var(--accent)';
+  document.getElementById('tnum').textContent=tLeft;
+}
+
+function doSkip(){
+  if(!active)return;
+  skipC++;playSkip();
+  setFB('ข้าม — คำตอบ: '+curQ.ans,'skip');
+  speak('ข้าม คำตอบคือ '+curQ.ans);
+  setTimeout(()=>{if(active)newQ();},1900);
+}
+
+function checkAns(){
+  if(!active)return;
+  const v=parseFloat(document.getElementById('ans').value);
+  if(isNaN(v)){speakNow();return;}
+  clearInterval(cdT);
+  const ok=Math.abs(v-curQ.ans)<0.051;
+  if(ok){
+    okC++;score+=pts();playOK();
+    setFB('✓ ถูก! +'+pts(),'ok');
+    moveP();
+  } else {
+    errC++;playErr();
+    setFB('✗ ผิด! คำตอบ: '+curQ.ans,'err');
+    shakeP();
+    speak('ผิด คำตอบที่ถูกคือ '+curQ.ans);
+    setTimeout(()=>{if(active)newQ();},2000);
+  }
+  updStats();
+}
+
+function pts(){return diff==='easy'?8:diff==='normal'?10:15;}
+
+function moveP(){
+  const old=document.getElementById('dot'+pos);
+  if(old){old.className='dot dd';old.textContent='✓';}
+  const con=document.getElementById('con'+pos);
+  if(con)con.classList.add('done');
+  pos++;
+  const cur=document.getElementById('dot'+pos);
+  if(cur){cur.className='dot dp';cur.textContent='🚶';}
+  document.getElementById('dot'+pos)?.scrollIntoView({behavior:'smooth',inline:'center'});
+  updStats();
+  if(pos>=total)setTimeout(winGame,600);
+  else setTimeout(()=>{if(active)newQ();},800);
+}
+
+function shakeP(){
+  const d=document.getElementById('dot'+pos);
+  if(d){d.className='dot dw';setTimeout(()=>{d.className='dot dp';d.textContent='🚶';},1800);}
+}
+
+function winGame(){
+  active=false;stopMetro();clearInterval(cdT);
+  // save high score
+  const key='hs_'+diff;
+  const prev=parseInt(localStorage.getItem(key)||'0');
+  const isNew=score>prev;
+  if(isNew)localStorage.setItem(key,score);
+  // show win
+  document.getElementById('w-score').textContent=score;
+  document.getElementById('w-ok').textContent=okC;
+  document.getElementById('w-err').textContent=errC;
+  document.getElementById('w-skip').textContent=skipC;
+  document.getElementById('w-dots').textContent=total;
+  const best=document.getElementById('w-best');
+  if(isNew){best.style.display='block';best.textContent='🌟 สถิติใหม่! สูงสุด: '+score;}
+  else{best.style.display='block';best.textContent='สถิติสูงสุด: '+Math.max(score,prev);}
+  document.getElementById('win').style.display='flex';
+  speak('ยินดีด้วย คุณได้คะแนน '+score+' คะแนน');
+}
+
+function updStats(){
+  document.getElementById('s-pos').textContent=pos+'/'+total;
+  document.getElementById('s-score').textContent=score;
+  document.getElementById('s-ok').textContent=okC;
+  document.getElementById('s-err').textContent=errC;
+}
+
+function setFB(msg,type){
+  const el=document.getElementById('fb');
+  el.textContent=msg;el.className='';
+  if(type){el.className=type+' show';}
+}
+
+// ── SETTINGS ──
+function selDiff(d){
+  diff=d;
+  ['easy','normal','hard'].forEach(x=>{
+    document.getElementById('d-'+x).classList.toggle('sel',x===d);
+  });
+}
+function selMode(m,el){
+  mode=m;
+  document.querySelectorAll('.mode-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// ── INPUT ──
+document.getElementById('ans').addEventListener('keydown',e=>{if(e.key==='Enter')checkAns();});
+
+// ── iOS install hint ──
+function isIOS(){return/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.navigator.standalone;}
+window.addEventListener('load',()=>{
+  if(isIOS()){
+    const shown=sessionStorage.getItem('ios-hint-shown');
+    if(!shown){
+      setTimeout(()=>{
+        document.getElementById('ios-hint').style.display='block';
+        sessionStorage.setItem('ios-hint-shown','1');
+      },3000);
+    }
+  }
+});
+</script>
+</body>
+</html>
