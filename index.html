@@ -386,10 +386,28 @@ const DIFF={
 };
 
 // ── AUDIO ──
-function gAC(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();return AC;}
+function gAC(){
+  if(!AC) AC=new(window.AudioContext||window.webkitAudioContext)();
+  return AC;
+}
+
+// iOS requires AudioContext.resume() called synchronously inside a user gesture
+// AND a silent buffer trick to fully unlock audio on older Safari
+function unlockAudio(){
+  const c=gAC();
+  // resume if suspended (iOS always starts suspended)
+  if(c.state==='suspended') c.resume();
+  // play a silent buffer to unlock — required on some iOS versions
+  const buf=c.createBuffer(1,1,22050);
+  const src=c.createBufferSource();
+  src.buffer=buf;src.connect(c.destination);src.start(0);
+}
+
 function tone(freq,dur,vol=0.3,type='sine'){
   try{
-    const c=gAC(),t=c.currentTime,o=c.createOscillator(),g=c.createGain();
+    const c=gAC();
+    if(c.state==='suspended') c.resume();
+    const t=c.currentTime,o=c.createOscillator(),g=c.createGain();
     o.connect(g);g.connect(c.destination);
     o.frequency.value=freq;o.type=type;
     g.gain.setValueAtTime(vol,t);
@@ -423,12 +441,23 @@ function setBPM(v){
 }
 
 // ── TTS ──
+let ttsUnlocked=false;
+function unlockTTS(){
+  if(ttsUnlocked||!window.speechSynthesis)return;
+  // iOS requires a speak() call inside a user gesture to unlock TTS
+  const u=new SpeechSynthesisUtterance('');
+  u.volume=0;window.speechSynthesis.speak(u);
+  ttsUnlocked=true;
+}
 function speak(t){
   if(!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(t);
   u.lang='th-TH';u.rate=0.9;u.pitch=1.05;
-  window.speechSynthesis.speak(u);
+  // iOS sometimes needs voices loaded first
+  const doSpeak=()=>window.speechSynthesis.speak(u);
+  if(window.speechSynthesis.getVoices().length) doSpeak();
+  else window.speechSynthesis.addEventListener('voiceschanged',doSpeak,{once:true});
 }
 function speakNow(){if(curQ)speak(curQ.spk)}
 
@@ -464,7 +493,8 @@ function genQ(){
 
 // ── GAME ──
 function startGame(){
-  gAC();
+  unlockAudio(); // must be called synchronously inside user gesture on iOS
+  unlockTTS();   // same requirement for speechSynthesis on iOS
   total=+document.getElementById('goal-sel').value;
   bpm=+document.getElementById('bpm-sel').value;
   document.getElementById('bpm-lbl').textContent=bpm+' BPM';
