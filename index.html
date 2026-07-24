@@ -126,6 +126,14 @@ body{
 #bpm-lbl{font-family:'Space Mono',monospace;font-size:10px;color:var(--text3);flex-shrink:0}
 #tbar-w{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
 #tbar{height:100%;background:var(--accent);border-radius:3px;width:100%}
+#reading-badge{
+  font-size:11px;font-weight:500;letter-spacing:0.5px;
+  padding:3px 12px;border-radius:999px;
+  background:rgba(255,201,71,0.12);color:var(--gold);
+  border:1px solid rgba(255,201,71,0.25);
+  display:none;flex-shrink:0;
+}
+#tnum.reading{color:var(--gold)}
 #tnum{font-family:'Space Mono',monospace;font-size:12px;color:var(--text2);min-width:22px;text-align:right;flex-shrink:0}
 #diff-badge{
   padding:3px 9px;border-radius:999px;font-size:10px;font-weight:600;flex-shrink:0;
@@ -290,6 +298,17 @@ body{
       </select>
     </div>
     <div class="ov-row">
+      <span class="ov-row-label">เวลาคิดต่อข้อ</span>
+      <select id="qt-sel">
+        <option value="8">8 วินาที</option>
+        <option value="10">10 วินาที</option>
+        <option value="15" selected>15 วินาที</option>
+        <option value="20">20 วินาที</option>
+        <option value="30">30 วินาที</option>
+        <option value="60">60 วินาที</option>
+      </select>
+    </div>
+    <div class="ov-row">
       <span class="ov-row-label">จุดเป้าหมาย</span>
       <select id="goal-sel">
         <option value="10">10 จุด</option>
@@ -340,8 +359,9 @@ body{
   </div>
   <div id="bpm-lbl">60 BPM</div>
   <div id="diff-badge"></div>
+  <div id="reading-badge">🔊 กำลังอ่าน...</div>
   <div id="tbar-w"><div id="tbar"></div></div>
-  <div id="tnum">15</div>
+  <div id="tnum">—</div>
 </div>
 
 <div id="q-sec">
@@ -373,11 +393,11 @@ if('serviceWorker' in navigator)
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 // ── STATE ──
-let AC=null,metroT=null,cdT=null,beatI=0,bpm=60;
+let AC=null,metroT=null,cdT=null,beatI=0,bpm=60,QT=15;
 let mode='mix',diff='normal';
 let pos=0,score=0,okC=0,errC=0,skipC=0,total=15;
 let curQ=null,active=false,tLeft=15;
-const QT=15;
+// QT is now set from settings
 
 const DIFF={
   easy:{label:'🌱 ง่าย',color:'#00e5a0',ops:['add','sub'],ranges:{add:[50,299],sub:[50,299],mul:[2,9],div:[2,9],divQ:[1,9]}},
@@ -444,22 +464,25 @@ function setBPM(v){
 let ttsUnlocked=false;
 function unlockTTS(){
   if(ttsUnlocked||!window.speechSynthesis)return;
-  // iOS requires a speak() call inside a user gesture to unlock TTS
   const u=new SpeechSynthesisUtterance('');
   u.volume=0;window.speechSynthesis.speak(u);
   ttsUnlocked=true;
 }
+// speak() for non-question text (result announcements etc.)
 function speak(t){
   if(!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(t);
   u.lang='th-TH';u.rate=0.9;u.pitch=1.05;
-  // iOS sometimes needs voices loaded first
-  const doSpeak=()=>window.speechSynthesis.speak(u);
-  if(window.speechSynthesis.getVoices().length) doSpeak();
-  else window.speechSynthesis.addEventListener('voiceschanged',doSpeak,{once:true});
+  window.speechSynthesis.speak(u);
 }
-function speakNow(){if(curQ)speak(curQ.spk)}
+// speakNow: re-read question and restart countdown after reading
+function speakNow(){
+  if(!curQ||!active)return;
+  clearInterval(cdT);
+  setReading(true);
+  speakThenCount(curQ.spk);
+}
 
 // ── QUESTION GEN ──
 function rnd(a,b){return Math.floor(Math.random()*(b-a+1))+a}
@@ -471,24 +494,24 @@ function genQ(){
   const t=ops[rnd(0,ops.length-1)];
   if(t==='add'){
     const a=rnd(r.add[0],r.add[1]),b=rnd(r.add[0],r.add[1]);
-    return{html:`${a} <span class="op">+</span> ${b} <span class="eq">=</span> ?`,ans:a+b,spk:`${a} บวก ${b} เท่ากับเท่าไหร่`,hint:'บวก'};
+    return{html:`${a} <span class="op">+</span> ${b} <span class="eq">=</span> ?`,ans:a+b,spk:`${a} บวก ${b}`,hint:'บวก'};
   }
   if(t==='sub'){
     const a=rnd(r.sub[0]+50,r.sub[1]),b=rnd(Math.floor(r.sub[0]*0.5),a-1);
-    return{html:`${a} <span class="op">−</span> ${b} <span class="eq">=</span> ?`,ans:a-b,spk:`${a} ลบ ${b} เท่ากับเท่าไหร่`,hint:'ลบ'};
+    return{html:`${a} <span class="op">−</span> ${b} <span class="eq">=</span> ?`,ans:a-b,spk:`${a} ลบ ${b}`,hint:'ลบ'};
   }
   if(t==='mul'){
     const a=rnd(r.mul[0],r.mul[1]),b=rnd(r.mul[0],r.mul[1]);
-    return{html:`${a} <span class="op">×</span> ${b} <span class="eq">=</span> ?`,ans:a*b,spk:`${a} คูณ ${b} เท่ากับเท่าไหร่`,hint:'คูณ'};
+    return{html:`${a} <span class="op">×</span> ${b} <span class="eq">=</span> ?`,ans:a*b,spk:`${a} คูณ ${b}`,hint:'คูณ'};
   }
   // div
   const b=rnd(r.div[0],r.div[1]),q=rnd(r.divQ[0],r.divQ[1]);
   if(rnd(0,1)){
     const rem=rnd(1,b-1),a=b*q*10+rem;
     const ans=Math.round((a/b)*10)/10;
-    return{html:`${a} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans,spk:`${a} หาร ${b} เท่ากับเท่าไหร่`,hint:'หาร (ทศนิยม)'};
+    return{html:`${a} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans,spk:`${a} หาร ${b}`,hint:'หาร (ทศนิยม)'};
   }
-  return{html:`${b*q} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans:q,spk:`${b*q} หาร ${b} เท่ากับเท่าไหร่`,hint:'หาร'};
+  return{html:`${b*q} <span class="op">÷</span> ${b} <span class="eq">=</span> ?`,ans:q,spk:`${b*q} หาร ${b}`,hint:'หาร'};
 }
 
 // ── GAME ──
@@ -498,6 +521,7 @@ function startGame(){
   total=+document.getElementById('goal-sel').value;
   bpm=+document.getElementById('bpm-sel').value;
   document.getElementById('bpm-lbl').textContent=bpm+' BPM';
+  QT=+document.getElementById('qt-sel').value;
   pos=0;score=0;okC=0;errC=0;skipC=0;active=true;
   document.getElementById('overlay').style.display='none';
   document.getElementById('win').style.display='none';
@@ -531,8 +555,47 @@ function newQ(){
   document.getElementById('q-hint').textContent=curQ.hint;
   document.getElementById('ans').value='';
   setFB('','');
-  tLeft=QT;updBar();
-  setTimeout(()=>speak(curQ.spk),350);
+  // Show reading state — bar frozen, timer shows dash
+  setReading(true);
+  setTimeout(()=>speakThenCount(curQ.spk),350);
+}
+
+function setReading(on){
+  document.getElementById('reading-badge').style.display=on?'flex':'none';
+  document.getElementById('tbar-w').style.opacity=on?'0.3':'1';
+  document.getElementById('tnum').textContent=on?'':''+tLeft;
+  if(on){
+    document.getElementById('tbar').style.width='100%';
+    document.getElementById('tbar').style.background='var(--gold)';
+  }
+}
+
+function speakThenCount(text){
+  if(!window.speechSynthesis){startCountdown();return;}
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='th-TH';u.rate=0.9;u.pitch=1.05;
+  u.onend=()=>{
+    setReading(false);
+    tLeft=QT;updBar();
+    startCountdown();
+  };
+  // Fallback: if onend never fires (iOS bug), start countdown after estimated duration
+  const estMs=Math.max(2500, text.length * 150);
+  const fallback=setTimeout(()=>{
+    if(document.getElementById('reading-badge').style.display!=='none'){
+      setReading(false);tLeft=QT;updBar();startCountdown();
+    }
+  }, estMs+600);
+  u.onend=()=>{
+    clearTimeout(fallback);
+    setReading(false);tLeft=QT;updBar();startCountdown();
+  };
+  window.speechSynthesis.speak(u);
+}
+
+function startCountdown(){
+  clearInterval(cdT);
   cdT=setInterval(()=>{
     tLeft--;updBar();
     if(tLeft<=0){clearInterval(cdT);doSkip();}
@@ -543,8 +606,10 @@ function updBar(){
   const p=(tLeft/QT)*100;
   const bar=document.getElementById('tbar');
   bar.style.width=p+'%';
-  bar.style.background=tLeft<=4?'var(--warn)':tLeft<=7?'var(--gold)':'var(--accent)';
+  const warn=Math.ceil(QT*0.25), gold=Math.ceil(QT*0.45);
+  bar.style.background=tLeft<=warn?'var(--warn)':tLeft<=gold?'var(--gold)':'var(--accent)';
   document.getElementById('tnum').textContent=tLeft;
+  document.getElementById('tnum').className=tLeft<=warn?'reading':'';
 }
 
 function doSkip(){
